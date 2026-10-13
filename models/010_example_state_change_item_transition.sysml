@@ -48,7 +48,6 @@ package example010 {
         }
     }
 } // package example010
-// test
 
 /* /Package example010 (7aa4f922-687d-438a-a176-c3da627496d3)
  * [OwningMembership] Package defs (8e8ea4b8-e4d9-4ecf-bcb5-8690ee562e08)
