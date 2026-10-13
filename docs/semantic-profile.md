@@ -70,7 +70,7 @@ An unbounded first-in-first-out buffer applies per consuming input, both between
 Initial feature values come from modeled defaults only (for example `attribute speed : Real = 0`). Features without a modeled default remain undefined; any expression requiring an undefined value triggers the D11 pause. Implicit zero defaults are rejected: they would mask wiring errors.
 
 ### D16 — Run start
-The run begins with a single initialization event: the structure is instantiated (D5), defaults are evaluated (D15), and every part's `do` behaviors and all `initially` successions start. Everything thereafter is user-stepped. Part-level performed actions (`performedActions` of a part) start at initialization and run concurrently with the part's exhibited state machine (D19).
+The run begins with a single initialization event: the structure is instantiated (D5), defaults are evaluated (D15), and every part's `do` behaviors and all `initially` successions start. Everything thereafter is user-stepped. Part-level performed actions (`performedActions` of a part) start at initialization and run concurrently with the part's exhibited state machine (D19). A part-level action usage declared without perform is not started by initialization; it is started by the behaviors that perform it (D32).
 
 ### D17 — Expression evaluator
 A tier-one subset: Boolean, Integer, Real, String, and enumerations; comparisons; boolean operators; arithmetic; conditional expressions; and feature references through qualified names and `self`. Collections and sequences are excluded. Unknown operands propagate as unknown and trigger the D11 pause; expressions fully determined by known values are computed automatically.
@@ -103,7 +103,7 @@ Triggerless completion transitions are part of the executability profile. A comp
 When a transition fires while a state's do behavior is executing, the do behavior is aborted immediately. Any action in progress at the abort instant is terminated, and all tokens within the do behavior are discarded. The abort is recorded in the trace with the position of every discarded token; discarding is reported, never silent. The exit behavior then runs.
 
 ### D24 — Run termination
-A run ends successfully only when all parts' state machines are in a final state. Quiescence with at least one part not in a final state is the deadlock anomaly of section 3.2. W02 statically reports events that could arrive in unprotected states, including final states.
+A run ends successfully only when all parts' state machines are in a final state. Quiescence with at least one part not in a final state is the deadlock anomaly of section 3.2. W02 statically reports events that could arrive in unprotected states, including final states. The implicit done state that a top-level completion transition of an exhibited state machine reaches is final for this purpose; the adapter marks it accordingly.
 
 ### D25 — Ports and event identity
 Ports carry multiple typed items. Event identity is the triple of receiving part instance, port, and item type. The receiving part holds one first-in-first-out queue per (port, item type) pair, refining D7 and D14; an accept action matches the oldest event in its queue, and its guard is evaluated on the payload of that event.
@@ -136,6 +136,17 @@ Ports are optional in event routing. This decision resolves a latent contradicti
 6. The absence of a port is not a finding. E06 remains reserved for references that do not resolve or resolve ambiguously, including an incomplete payload operator chain.
 
 Consequential edits: convention 5 is reworded; the detection methods of E03, W02, and W05 are extended to port-less and self-directed sends.
+
+### D32 — Perform references and usage counting
+A model declares each action usage once; behaviors may reference the declared usage through perform. This decision records how many usages and how many executions exist and when they start.
+
+1. A perform that declares the usage, for example `perform action a1 : defs::A1;`, is an owning performance. At part level it starts at initialization and runs concurrently with the exhibited state machine (D16); within a behavior it starts when the behavior reaches it.
+2. A perform that references an existing usage, for example `perform a1;`, is a PerformActionUsage whose reference subsetting targets the declared usage. It denotes the same execution as the referenced usage; it creates no additional usage and no additional execution. The parser graph contains two elements joined by ReferenceSubsetting, but they denote one occurrence.
+3. The execution of a declared usage that is not itself performed starts when the first perform referencing it is reached. A reference perform of a running execution joins it: the performing step completes when the referenced execution completes. A reference perform of a completed execution is satisfied immediately. A declared usage that no behavior ever performs never starts and is reported under W01.
+4. Input and output wiring is checked on the declared usage (E01, E11). Flows declared in any behavior of the part that target or source the pins of the declared usage count as wiring of that usage.
+5. An action output that no flow carries but that at least one expression reads, for example as a send payload, is not an orphan. Reading it before production is the finding E12 and, at runtime, a D11 pause.
+
+Consequential edits: convention 10 is reworded; the W08 wording and the E11 condition are narrowed to declared usages; D16 references this decision.
 
 ## 3. Error Semantics
 
@@ -197,7 +208,7 @@ All checks operate on the simulation metamodel after loading, never on the API s
 | E08 | Construct outside profile | The model uses streaming (D9), item multiplicities (D6), or physical time constructs (D3) without a defined mapping. |
 | E09 | Uninstantiable part | A part usage resolves to an abstract or missing part definition. |
 | E10 | Recursive containment | A part directly or indirectly contains itself with unbounded multiplicity, which would produce infinite instantiation. |
-| E11 | Orphan output | An action output produces tokens with no destination and is not explicitly declared unused in the model. |
+| E11 | Orphan output | An action output produces tokens with no destination, that is, no outgoing flow and no expression reading it (D32), and is not explicitly declared unused in the model. |
 | E12 | Undefined ordering dependency | An expression, for example a send payload or a computed output, reads a feature of another occurrence while no explicit succession or flow orders that occurrence before the reading occurrence. The kernel does not derive implicit data dependencies; the model must express the ordering explicitly. |
 
 ### 5.2 Warnings (advisory)
@@ -211,7 +222,7 @@ All checks operate on the simulation metamodel after loading, never on the API s
 | W05 | Unproducible trigger | A transition trigger names an event type that no element in the model ever produces. |
 | W06 | Unused part | No event or initial construct can ever trigger any behavior of the part. |
 | W07 | Deadlock potential | A composite structure can become quiescent while behavior is incomplete; reported where decidable. |
-| W08 | Multiple usages of one action definition | An action definition acquires more than one usage, violating convention 10 and making state machine references ambiguous. |
+| W08 | Multiple usages of one action definition | An action definition acquires more than one declared usage, violating convention 10 and making state machine references ambiguous; reference performs of the one declared usage are not usages (D32). |
 
 Detection method for W02: for each part, compute the set of event types it can receive, from item flows across connections targeting it and from send actions in other parts, including port-less sends and self-sends (D31), and the set of statically reachable states. Report every (state, event type) pair not covered by an accepting transition, an else guard, a completion transition, or an accept action that the do behavior of the state reaches unconditionally, that is, without an intervening guard, decision, or event-dependent step; where this reachability is not decidable, the pair is reported, as with W07. The computation over-approximates, which is why the finding is a warning; at runtime, D13 applies.
 
@@ -235,7 +246,7 @@ Strong Kleene three-valued logic. `not` applied to unknown yields unknown. `and`
 - Feature access: navigation node; resolution is defined in 6.5.
 
 ### 6.5 Feature resolution
-Scopes resolve innermost first. In an action: the action parameters, then local features of the enclosing behavior, then the features of the part instance performing the behavior, reached through `self`. In a transition guard or effect: the trigger parameters bound to the event payload, then features of the state machine, then `self`. `self` always denotes the part instance performing the behavior (D7). A reference to a statically nonexistent feature is finding E06; a reference to a currently unset feature yields unknown. Bound features are evaluated lazily on read; modeled defaults are evaluated at initialization (D15, D16). Feature access on an accepted item navigates its attributes, so guards may reference payload attributes such as an error code (D26). Feature value bindings (D26) are aliases: reading a bound feature yields the current value of the shared value, and assignment to either bound feature changes it for both.
+Scopes resolve innermost first. In an action: the action parameters, then local features of the enclosing behavior, then the features of the part instance performing the behavior, reached through `self`. In a transition guard or effect: the trigger parameters bound to the event payload, then features of the state machine, then `self`. `self` always denotes the part instance performing the behavior (D7). A reference to a statically nonexistent feature is finding E06; a reference to a currently unset feature yields unknown. Bound features are evaluated lazily on read; modeled defaults are evaluated at initialization (D15, D16). Feature access on an accepted item navigates its attributes, so guards may reference payload attributes such as an error code (D26). Feature value bindings (D26) are aliases: reading a bound feature yields the current value of the shared value, and assignment to either bound feature changes it for both. The name done inside an action body denotes the completion of the innermost enclosing behavior and is resolved contextually by the adapter; the model graph may represent it as a single shared element (observed in the Pilot Implementation graph of example010), in which case element identity must not be used to distinguish the completions of different behaviors.
 
 ### 6.6 Purity and effects
 Expressions are pure: they produce no events and change no features. All effects are behavior constructs; in the first version these are assignment to a feature and sending of an event. Guards are evaluated at event dispatch; decision conditions at token arrival.
@@ -257,7 +268,7 @@ The simulator targets the following modeling style, which the adapter (D20) must
 7. Item flows are modeled separately from succession flows, which express the order of activation of actions.
 8. Decisions use decision nodes with explicit if and else.
 9. Parallel behavior is modeled explicitly with fork, join, and merge.
-10. Actions are predefined and referenced through perform with a single usage per action definition.
+10. Actions are predefined and referenced through perform. Each action definition has exactly one declared usage; further perform references to the declared usage are references to the same execution, not additional usages (D32).
 11. Planned extension: messages during occurrences (see deferred scope, item 6).
 12. Items are instances with identity; item types may be structured with attributes (D27).
 13. A part may send events to itself; self-sends are dispatched after the current run-to-completion step (D28).

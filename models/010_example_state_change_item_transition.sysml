@@ -16,9 +16,9 @@ package example010 {
     } // package defs
 
     part p1 {
-        perform action a1 : defs::A1;
-        perform action a2 : defs::A2;
-        perform action a3 : defs::A3;
+        action a1 : defs::A1;
+        action a2 : defs::A2;
+        action a3 : defs::A3;
         flow from a2.iout to a3.iin;
 
         // port required for "via"
@@ -26,10 +26,9 @@ package example010 {
             entry;
             then state s1 {
                 do action s1Do {
-                    perform a1;
-                    send a1.iout to p1;
-
-                    send new defs::StateTransitionTrigger() to p1;
+                    first perform a1;
+                    then send a1.iout to p1;
+                    then send new defs::StateTransitionTrigger() to p1;
                     then done;
                 }
             }
