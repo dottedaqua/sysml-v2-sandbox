@@ -25,7 +25,7 @@ snapshot of the model and produces its own trace; the model store is never modif
 ## Repository layout
 
 - `docs/semantic-profile.md` — the specification baseline: simulation semantics,
-  decisions D1 through D30, error semantics, static check catalogue, expression
+  decisions D1 through D31, error semantics, static check catalogue, expression
   evaluator semantics, and the supported modeling conventions.
 - `docs/simulation-metamodel.md` — the simulator-internal metamodel and the inputs
   required from the modeling tool for the adapter.

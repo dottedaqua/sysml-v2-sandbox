@@ -70,7 +70,7 @@ An unbounded first-in-first-out buffer applies per consuming input, both between
 Initial feature values come from modeled defaults only (for example `attribute speed : Real = 0`). Features without a modeled default remain undefined; any expression requiring an undefined value triggers the D11 pause. Implicit zero defaults are rejected: they would mask wiring errors.
 
 ### D16 — Run start
-The run begins with a single initialization event: the structure is instantiated (D5), defaults are evaluated (D15), and every part's `do` behaviors and all `initially` successions start. Everything thereafter is user-stepped.
+The run begins with a single initialization event: the structure is instantiated (D5), defaults are evaluated (D15), and every part's `do` behaviors and all `initially` successions start. Everything thereafter is user-stepped. Part-level performed actions (`performedActions` of a part) start at initialization and run concurrently with the part's exhibited state machine (D19).
 
 ### D17 — Expression evaluator
 A tier-one subset: Boolean, Integer, Real, String, and enumerations; comparisons; boolean operators; arithmetic; conditional expressions; and feature references through qualified names and `self`. Collections and sequences are excluded. Unknown operands propagate as unknown and trigger the D11 pause; expressions fully determined by known values are computed automatically.
@@ -108,6 +108,8 @@ A run ends successfully only when all parts' state machines are in a final state
 ### D25 — Ports and event identity
 Ports carry multiple typed items. Event identity is the triple of receiving part instance, port, and item type. The receiving part holds one first-in-first-out queue per (port, item type) pair, refining D7 and D14; an accept action matches the oldest event in its queue, and its guard is evaluated on the payload of that event.
 
+Superseded in part by D31: ports are optional, the queue key is the item type, and each entry carries an optional port qualifier. Self-delivery (D28) is the untagged case.
+
 ### D26 — Items, payload structure, and bind
 Items are structured: an item type may carry attributes, for example an error code as Integer. The complete item value, including all attributes, travels unchanged across connections and bind chains. Bind is used for abstraction-level item transfer: the routing layer follows flow delegation across hierarchy levels and delivers the event with its full payload. Guards may navigate payload attributes through feature access on the accepted item (section 6.5). Bind is additionally used to alias feature values: bound features denote one shared value; reading either feature yields the current value, and assignment to either bound feature changes it for both (section 6.5).
 
@@ -122,6 +124,18 @@ A behavior completes implicitly when all its sub-actions have completed and no s
 
 ### D30 — Indexed references through multiplicity
 A perform reference or send target through a part usage with multiplicity greater than one must carry an explicit instance index. Unindexed references are static findings (E06). Broadcast semantics, in which an unindexed reference denotes all instances, is excluded from the profile.
+
+### D31 — Port-less event routing
+Ports are optional in event routing. This decision resolves a latent contradiction between D25, which keys every queue on a port, and D28, which places self-sent events in the part's own queue without a port. It also aligns the profile with the graph representation of D20, in which the receiver of a send action and of an accept action is a part usage; a model need not contain any port.
+
+1. An event occurrence is identified by the pair of receiving part instance and item type, and carries an optional port qualifier.
+2. A send action may address a port usage (the event is tagged with that port), another part usage (untagged direct delivery), or the sending part itself (untagged self-delivery, D28). The sender is materialized by the adapter as the part instance performing the enclosing behavior.
+3. Each part instance holds one first-in-first-out queue per item type, refining D7 and D14. Each entry records its optional port qualifier and its global event number (D3).
+4. An accept action with an explicit port matches only entries tagged with the same port instance; an accept action without a port matches every entry of its item type. An accept action without an explicit receiver defaults to the part instance performing the enclosing behavior. The guard is evaluated on the payload of the matched event.
+5. Dispatch takes the oldest entry of a queue; if no active acceptor matches it, D13 applies. Entries are never reordered or silently discarded.
+6. The absence of a port is not a finding. E06 remains reserved for references that do not resolve or resolve ambiguously, including an incomplete payload operator chain.
+
+Consequential edits: convention 5 is reworded; the detection methods of E03, W02, and W05 are extended to port-less and self-directed sends.
 
 ## 3. Error Semantics
 
@@ -161,6 +175,7 @@ The following are deliberately out of scope for the first version and may be rev
 6. Messaging over occurrences, the planned model extension. The trace format is occurrence-based from the start, so this extension enriches the trace rather than breaking it.
 7. Orthogonal (parallel) state regions. Parallelism is modeled exclusively through fork and join inside behaviors.
 8. Broadcast semantics for unindexed references and send targets through part usages with multiplicity (excluded by D30).
+9. Broadcast of a single event occurrence to multiple acceptors. An occurrence is consumed exactly once; the handover of an item across a state transition is modeled through trigger payload binding on the transition, never through multiple consumption.
 
 All modeling-convention clarifications are resolved. The unexpected-event convention (an else-guarded or default transition to an explicit error state for every event type a state can receive) is adopted as a mandatory modeling rule; W02 reports violations of this rule (see section 8).
 
@@ -183,6 +198,7 @@ All checks operate on the simulation metamodel after loading, never on the API s
 | E09 | Uninstantiable part | A part usage resolves to an abstract or missing part definition. |
 | E10 | Recursive containment | A part directly or indirectly contains itself with unbounded multiplicity, which would produce infinite instantiation. |
 | E11 | Orphan output | An action output produces tokens with no destination and is not explicitly declared unused in the model. |
+| E12 | Undefined ordering dependency | An expression, for example a send payload or a computed output, reads a feature of another occurrence while no explicit succession or flow orders that occurrence before the reading occurrence. The kernel does not derive implicit data dependencies; the model must express the ordering explicitly. |
 
 ### 5.2 Warnings (advisory)
 
@@ -197,7 +213,7 @@ All checks operate on the simulation metamodel after loading, never on the API s
 | W07 | Deadlock potential | A composite structure can become quiescent while behavior is incomplete; reported where decidable. |
 | W08 | Multiple usages of one action definition | An action definition acquires more than one usage, violating convention 10 and making state machine references ambiguous. |
 
-Detection method for W02: for each part, compute the set of event types it can receive, from item flows across connections targeting it and from send actions in other parts, and the set of statically reachable states. Report every (state, event type) pair not covered by an accepting transition, an else guard, or a completion transition. The computation over-approximates, which is why the finding is a warning; at runtime, D13 applies.
+Detection method for W02: for each part, compute the set of event types it can receive, from item flows across connections targeting it and from send actions in other parts, including port-less sends and self-sends (D31), and the set of statically reachable states. Report every (state, event type) pair not covered by an accepting transition, an else guard, or a completion transition. The computation over-approximates, which is why the finding is a warning; at runtime, D13 applies.
 
 ## 6. Expression Evaluator Semantics
 
@@ -236,7 +252,7 @@ The simulator targets the following modeling style, which the adapter (D20) must
 2. State transitions are triggered by accept actions; events originate in send actions. No implicit event generation exists.
 3. Behavior inside states is described through entry, do, and exit. Completion transitions (D22) are used after entry and do complete.
 4. All behavior is described as actions. Items carry objects and information; energy flows are not modeled; flows are not streams.
-5. Items flow between parts through ports. Ports carry multiple typed items; event identity is the triple of receiving part instance, port, and item type (D25).
+5. Items flow between parts through ports where ports are modeled; direct part-to-part and self-directed delivery without a port is also supported (D31). Ports carry multiple typed items; event identity is the pair of receiving part instance and item type with an optional port qualifier (D25, D31).
 6. Bind is used for abstraction-level item transfer; the routing layer follows flow delegation across hierarchy levels, carrying the complete structured payload including all attributes (D26).
 7. Item flows are modeled separately from succession flows, which express the order of activation of actions.
 8. Decisions use decision nodes with explicit if and else.
