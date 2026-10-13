@@ -175,7 +175,7 @@ The following are deliberately out of scope for the first version and may be rev
 6. Messaging over occurrences, the planned model extension. The trace format is occurrence-based from the start, so this extension enriches the trace rather than breaking it.
 7. Orthogonal (parallel) state regions. Parallelism is modeled exclusively through fork and join inside behaviors.
 8. Broadcast semantics for unindexed references and send targets through part usages with multiplicity (excluded by D30).
-9. Broadcast of a single event occurrence to multiple acceptors. An occurrence is consumed exactly once; the handover of an item across a state transition is modeled through trigger payload binding on the transition, never through multiple consumption.
+9. Broadcast of a single event occurrence to multiple acceptors. An occurrence is consumed exactly once; the handover of an item across a state transition is modeled either through trigger payload binding on the transition or through a second send whose event is consumed by an accept action in the target state's do behavior, never through multiple consumption.
 
 All modeling-convention clarifications are resolved. The unexpected-event convention (an else-guarded or default transition to an explicit error state for every event type a state can receive) is adopted as a mandatory modeling rule; W02 reports violations of this rule (see section 8).
 
@@ -205,7 +205,7 @@ All checks operate on the simulation metamodel after loading, never on the API s
 | ID | Check | Condition |
 | --- | --- | --- |
 | W01 | Unreachable node | An action or state cannot be reached from any initially started behavior or initial state. |
-| W02 | Potential unhandled event | Part P may statically receive event type E in state S while no transition of S accepts E and no else or completion transition covers it. Runtime verification of such a situation is a hard error (D13). |
+| W02 | Potential unhandled event | Part P may statically receive event type E in state S while no transition of S accepts E, no else or completion transition covers it, and no accept action that the do behavior of S reaches unconditionally accepts E. Runtime verification of such a situation is a hard error (D13). |
 | W03 | Non-exhaustive decision | A decision node has no else guard and its guards are not provably exhaustive. |
 | W04 | Constant-false guard | A guard is statically always false; the transition or branch can never fire. |
 | W05 | Unproducible trigger | A transition trigger names an event type that no element in the model ever produces. |
@@ -213,7 +213,7 @@ All checks operate on the simulation metamodel after loading, never on the API s
 | W07 | Deadlock potential | A composite structure can become quiescent while behavior is incomplete; reported where decidable. |
 | W08 | Multiple usages of one action definition | An action definition acquires more than one usage, violating convention 10 and making state machine references ambiguous. |
 
-Detection method for W02: for each part, compute the set of event types it can receive, from item flows across connections targeting it and from send actions in other parts, including port-less sends and self-sends (D31), and the set of statically reachable states. Report every (state, event type) pair not covered by an accepting transition, an else guard, or a completion transition. The computation over-approximates, which is why the finding is a warning; at runtime, D13 applies.
+Detection method for W02: for each part, compute the set of event types it can receive, from item flows across connections targeting it and from send actions in other parts, including port-less sends and self-sends (D31), and the set of statically reachable states. Report every (state, event type) pair not covered by an accepting transition, an else guard, a completion transition, or an accept action that the do behavior of the state reaches unconditionally, that is, without an intervening guard, decision, or event-dependent step; where this reachability is not decidable, the pair is reported, as with W07. The computation over-approximates, which is why the finding is a warning; at runtime, D13 applies.
 
 ## 6. Expression Evaluator Semantics
 
