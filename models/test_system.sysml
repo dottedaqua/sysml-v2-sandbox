@@ -1,6 +1,6 @@
 
 /*============================================================================
-  DiagnosticSystem
+  Test_System
   Reference example model for the SysML v2 behavior simulator.
 
   Status: DRAFT. The textual syntax follows the SysML v2 Pilot Implementation
@@ -26,7 +26,7 @@
   - Do-behavior preemption on transitions ............... D23
 ============================================================================*/
 
-package DiagnosticSystem {
+package Test_System {
 
     private import ScalarValues::*;
 
