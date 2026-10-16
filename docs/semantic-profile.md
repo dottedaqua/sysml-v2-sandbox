@@ -73,7 +73,7 @@ Initial feature values come from modeled defaults only (for example `attribute s
 The run begins with a single initialization event: the structure is instantiated (D5), defaults are evaluated (D15), and every part's `do` behaviors and all `initially` successions start. Everything thereafter is user-stepped. Part-level performed actions (`performedActions` of a part) start at initialization and run concurrently with the part's exhibited state machine (D19). A part-level action usage declared without perform is not started by initialization; it is started by the behaviors that perform it (D32).
 
 ### D17 — Expression evaluator
-A tier-one subset: Boolean, Integer, Real, String, and enumerations; comparisons; boolean operators; arithmetic; conditional expressions; and feature references through qualified names and `self`. Collections and sequences are excluded. Unknown operands propagate as unknown and trigger the D11 pause; expressions fully determined by known values are computed automatically.
+A tier-one subset: Boolean, Integer, Real, String, and enumerations; comparisons; boolean operators; arithmetic; conditional expressions; item constructor expressions (D33); and feature references through qualified names and `self`. Collections and sequences are excluded. Unknown operands propagate as unknown and trigger the D11 pause; expressions fully determined by known values are computed automatically.
 
 ### D18 — Static findings enforcement
 Structural errors (unfed required input, missing initial state, unroutable event, type mismatch) prevent a run from starting. Warnings (unreachable nodes, potential unhandled events, buffer growth) are displayed but not blocking.
@@ -147,6 +147,16 @@ A model declares each action usage once; behaviors may reference the declared us
 5. An action output that no flow carries but that at least one expression reads, for example as a send payload, is not an orphan. Reading it before production is the finding E12 and, at runtime, a D11 pause.
 
 Consequential edits: convention 10 is reworded; the W08 wording and the E11 condition are narrowed to declared usages; D16 references this decision.
+
+### D33 — Constructor expressions for item types
+A ConstructorExpression of an item type, for example `new defs::StateTransitionTrigger()`, is admitted to the tier-one subset (D17) in every value position, for example as a send payload or on the right side of an assignment. Rules:
+
+1. The argument expressions, if any, must themselves be tier-one (D17); an argument outside the subset is E07.
+2. Each evaluation creates a fresh item instance with identity (D27); two evaluations never yield the same instance.
+3. An argument initializes the attribute it targets; an attribute without an argument takes its modeled default (D15) and remains unknown if no default is modeled.
+4. Constructor expressions of non-item types and other allocation constructs remain outside the profile (E07, E08).
+
+Consequential edits: D17 names item constructor expressions as part of the subset; section 6.6 records that the construction sends no events and changes no features.
 
 ## 3. Error Semantics
 
@@ -249,7 +259,7 @@ Strong Kleene three-valued logic. `not` applied to unknown yields unknown. `and`
 Scopes resolve innermost first. In an action: the action parameters, then local features of the enclosing behavior, then the features of the part instance performing the behavior, reached through `self`. In a transition guard or effect: the trigger parameters bound to the event payload, then features of the state machine, then `self`. `self` always denotes the part instance performing the behavior (D7). A reference to a statically nonexistent feature is finding E06; a reference to a currently unset feature yields unknown. Bound features are evaluated lazily on read; modeled defaults are evaluated at initialization (D15, D16). Feature access on an accepted item navigates its attributes, so guards may reference payload attributes such as an error code (D26). Feature value bindings (D26) are aliases: reading a bound feature yields the current value of the shared value, and assignment to either bound feature changes it for both. The name done inside an action body denotes the completion of the innermost enclosing behavior and is resolved contextually by the adapter; the model graph may represent it as a single shared element (observed in the Pilot Implementation graph of example010), in which case element identity must not be used to distinguish the completions of different behaviors.
 
 ### 6.6 Purity and effects
-Expressions are pure: they produce no events and change no features. All effects are behavior constructs; in the first version these are assignment to a feature and sending of an event. Guards are evaluated at event dispatch; decision conditions at token arrival.
+Expressions are pure: they produce no events and change no features. All effects are behavior constructs; in the first version these are assignment to a feature and sending of an event. The construction of a fresh item instance (D33) sends no events and changes no features; it is admitted in expressions for that reason. Guards are evaluated at event dispatch; decision conditions at token arrival.
 
 ## 7. Conformance Baseline
 
