@@ -4,11 +4,12 @@ package TC02_reference_perform {
     // declared usages. Rules: D9, D14, D32.
     // Expected load findings: none. No W08: the do-level performs are
     // references to the declared usages, not additional usages (D32).
-    // Expected run: init -> s1 -> s1Do: perform a1 starts a1 (first
-    // perform, D32 rule 3) -> a1 completes, token on a1.iout -> flow ->
-    // a3.iin (D14) -> perform a3 starts, consumes, completes (D9) ->
-    // s1Do completes -> completion s1 -> done -> success.
-    // Status: DRAFT pending validation.
+    // Expected run: init -> s1 -> s1Do: perform a1 starts a1 at the do
+    // behavior's start (implicit start, D32 rule 3) -> a1 completes, token
+    // on a1.iout -> flow -> a3.iin (D14) -> perform a3 starts, consumes,
+    // completes (D9) -> s1Do completes -> completion s1 -> done -> success.
+    // Status: validated against the SysML v2 Pilot Implementation parser
+    // (release 2026-08, kernel 0.62.0); no parser findings.
 
     package defs {
         item def I1;
@@ -25,7 +26,7 @@ package TC02_reference_perform {
             entry;
             then state s1 {
                 do action s1Do {
-                    first perform a1;
+                    perform a1;
                     then perform a3;
                     then done;
                 }

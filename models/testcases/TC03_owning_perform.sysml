@@ -7,7 +7,8 @@ package TC03_owning_perform {
     // Expected run: initialization starts a1 and the exhibit concurrently
     // (the user steps their order, recorded, D10/D18) -> a1 completes ->
     // entry -> s1 -> completion s1 -> done -> success.
-    // Status: DRAFT pending validation.
+    // Status: validated against the SysML v2 Pilot Implementation parser
+    // (release 2026-08, kernel 0.62.0); no parser findings.
 
     package defs {
         action def A1 { }

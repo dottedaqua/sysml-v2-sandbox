@@ -1,0 +1,48 @@
+name: Validate models
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  KERNEL_VERSION: "0.62.0"
+  PILOT_RELEASE: "2026-08"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Cache pilot kernel
+        uses: actions/cache@v4
+        with:
+          path: .cache
+          key: sysml-kernel-${{ env.KERNEL_VERSION }}
+
+      - name: Download the pilot kernel
+        run: |
+          mkdir -p .cache/kernel
+          if [ ! -f ".cache/kernel/sysml/jupyter-sysml-kernel-${KERNEL_VERSION}-all.jar" ]; then
+            curl -sSL -o .cache/kernel.zip \
+              "https://github.com/Systems-Modeling/SysML-v2-Pilot-Implementation/releases/download/${PILOT_RELEASE}/jupyter-sysml-kernel-${KERNEL_VERSION}.zip"
+            unzip -oq .cache/kernel.zip -d .cache/kernel
+          fi
+
+      - name: Compile the validator
+        run: |
+          mkdir -p build/tools
+          javac -cp ".cache/kernel/sysml/jupyter-sysml-kernel-${KERNEL_VERSION}-all.jar" tools/Validate.java -d build/tools
+
+      - name: Validate all models
+        env:
+          SYSML_LIBRARY_PATH: ${{ github.workspace }}/.cache/kernel/sysml/sysml.library
+        run: |
+          java -cp ".cache/kernel/sysml/jupyter-sysml-kernel-${KERNEL_VERSION}-all.jar:build/tools" Validate models

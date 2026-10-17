@@ -3,9 +3,12 @@ package TC06_undefined_ordering {
     // orders before the send. Finding: E12 (blocking, D18).
     // Expected load findings: E12; W02 for (s2, I1) and (done, I1).
     // Expected behavior: the run cannot start (D18). Resolution in the
-    // model: an explicit succession, first perform a1; then send a1.iout
-    // to p1;
-    // Status: DRAFT pending validation.
+    // model: an explicit succession, perform a1; then send a1.iout
+    // to p1. The pilot parser accepts the uncorrected model without
+    // findings; the ordering violation is detected only by the simulator
+    // (E12).
+    // Status: validated against the SysML v2 Pilot Implementation parser
+    // (release 2026-08, kernel 0.62.0); no parser findings.
 
     package defs {
         item def I1;

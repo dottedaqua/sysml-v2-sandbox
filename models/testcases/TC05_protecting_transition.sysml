@@ -10,8 +10,10 @@ package TC05_protecting_transition {
     // Wrong path: dispatch I1 first -> protecting transition s1 -> sErr ->
     // Trigger still queued -> dispatch in sErr -> D13 hard error with
     // provenance.
-    // Status: DRAFT pending validation, in particular the explicit
-    // transition source notation (as with example011).
+    // Status: validated against the SysML v2 Pilot Implementation parser
+    // (release 2026-08, kernel 0.62.0); no parser findings. The accept
+    // shorthand attaches to the preceding state usage; the explicit
+    // transition source prefix was removed as invalid syntax.
 
     package defs {
         item def I1;
@@ -28,14 +30,14 @@ package TC05_protecting_transition {
             entry;
             then state s1 {
                 do action s1Do {
-                    first perform a1;
+                    perform a1;
                     then send a1.iout to p1;
                     then send new defs::Trigger() to p1;
                     then done;
                 }
             }
-            s1 accept defs::Trigger via p1 then s2;
-            s1 accept defs::I1 via p1 then sErr; // protection (convention 15)
+            accept defs::Trigger via p1 then s2;
+            accept defs::I1 via p1 then sErr; // protection (convention 15)
             state s2 {
                 do action s2Do {
                     action get accept x : defs::I1;

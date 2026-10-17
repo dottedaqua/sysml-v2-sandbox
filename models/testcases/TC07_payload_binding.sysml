@@ -2,15 +2,15 @@ package TC07_payload_binding {
     // Single event occurrence crossing a transition through trigger payload
     // binding (deferred-scope item 9, first handover pattern), minimized
     // from example011. Rules: D22, D24, D26, D27, D31, D33; finding W02.
-    // Expected load findings: W02 for (s2, Trigger) and (final, Trigger);
+    // Expected load findings: W02 for (s2, Trigger) and (done, Trigger);
     // acknowledged per D18.
     // Expected run: init -> s1 -> s1Do sends a fresh Trigger (D33) ->
     // s1Do completes -> dispatch Trigger -> transition fires, the effect
     // binds the payload to the part feature (identity preserved, D26,
-    // D27) -> s2 stable -> completion s2 -> final (D22) -> queues empty
+    // D27) -> s2 stable -> completion s2 -> done (D22) -> queues empty
     // -> success (D24). The occurrence is consumed exactly once.
-    // Status: DRAFT pending validation, in particular the payload binding,
-    // the transition effect, and the final notation (as with example011).
+    // Status: validated against the SysML v2 Pilot Implementation parser
+    // (release 2026-08, kernel 0.62.0); no parser findings.
 
     package defs {
         item def Trigger;
@@ -27,12 +27,11 @@ package TC07_payload_binding {
                     then done;
                 }
             }
-            accept defs::Trigger : tr then s2 {
-                assign self.received = tr;
+            accept tr : defs::Trigger then s2 {
+                assign p1.received := tr;
             }
             state s2;
-            s2 then final;
-            final;
+            then done;
         }
     }
 } // package TC07_payload_binding

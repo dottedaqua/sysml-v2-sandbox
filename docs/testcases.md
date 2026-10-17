@@ -12,7 +12,7 @@ The existing examples, models/010_example_state_change_item_transition.sysml (tw
 
 ## 2. Conventions
 
-- All case models are DRAFT pending validation against the SysML v2 Pilot Implementation parser; the validated parser graph is appended to each file, as with the examples.
+- All case models are validated against the SysML v2 Pilot Implementation parser (release 2026-08, kernel 0.62.0). The validation is repeated automatically on every push by the workflow .github/workflows/validate-models.yml using the helper tools/Validate.java. The pilot parser checks the textual syntax and the language semantics; the E and W findings catalogued below are expectations of the simulator's own static checks and are not reported by the pilot parser.
 - A simulator passes a case if it: reports exactly the listed load findings; follows the scripted run, recording every listed choice in the trace (D10, section 3.3); and terminates with the listed outcome.
 - Warnings are acknowledged per run (D18); the acknowledgement is part of the scripted run.
 - Per D22, completion transitions take priority over queued events at every choice point; this priority is part of the expected traces.
@@ -67,28 +67,46 @@ The existing examples, models/010_example_state_change_item_transition.sysml (tw
 ### TC06 - Undefined ordering dependency
 - Intent: a send payload reads an action output that no succession orders before the send; E12 is blocking.
 - Load findings: E12 (blocking); W02 for (s2, I1) and (done, I1).
-- Expected behavior: the run cannot start (D18). Resolution in the model: an explicit succession, first perform a1; then send a1.iout to p1; the corrected model matches TC05 structurally.
+- Expected behavior: the run cannot start (D18). The pilot parser accepts the uncorrected model without findings; the ordering violation is detected only by the simulator (E12). Resolution in the model: an explicit succession, perform a1; then send a1.iout to p1; the corrected model matches TC05 structurally.
 - Pass criteria: E12 reported with the reading expression and the unordered producer named.
 
 ### TC07 - Trigger payload binding
 - Intent: the first handover pattern of deferred-scope item 9, minimized from example011: a single occurrence crosses the transition through payload binding, consumed exactly once.
-- Load findings: W02 for (s2, Trigger) and (final, Trigger); acknowledged.
-- Scripted run: (1) s1Do sends a fresh Trigger (D33) and completes; (2) the Trigger is dispatched; the transition fires; the effect binds the payload to the part feature (identity preserved, D26, D27); (3) s2 is stable; its completion transition fires (D22); (4) final; queues are empty; success.
+- Load findings: W02 for (s2, Trigger) and (done, Trigger); acknowledged.
+- Scripted run: (1) s1Do sends a fresh Trigger (D33) and completes; (2) the Trigger is dispatched; the transition fires; the effect binds the payload to the part feature (identity preserved, D26, D27); (3) s2 is stable; its completion transition fires (D22); (4) done is final; queues are empty; success.
 - Pass criteria: success; exactly one consumption of the occurrence; the bound feature and the sent item have the same identity.
 
 ### TC08 - Unknown value and the D11 pause
 - Intent: a constructed item attribute without a modeled default is unknown (D15, D33 rule 3); the effect that reads it pauses the run; the user-supplied value is recorded.
-- Load findings: W02 for (s2, Payload) and (final, Payload); acknowledged.
-- Scripted run: (1) s1Do sends a fresh Payload with unknown code and completes; (2) the Payload is dispatched; the transition effect reads pl.code: D11 pause; the user supplies 42; the choice is recorded (section 3.3); (3) s2 is stable; the completion transition fires (D22); final; success.
+- Load findings: W02 for (s2, Payload) and (done, Payload); acknowledged.
+- Scripted run: (1) s1Do sends a fresh Payload with unknown code and completes; (2) the Payload is dispatched; the transition effect reads pl.code: D11 pause; the user supplies 42; the choice is recorded (section 3.3); (3) s2 is stable; the completion transition fires (D22); done is final; success.
 - Pass criteria: exactly one pause; the recorded value 42 appears in the trace and in the subsequent state of lastCode.
 
 ## 5. Open discussion points
 
-1. Convention 15 and final states: final states cannot carry outgoing transitions, so every receivable event type yields a W02 pair for every final state (TC04, TC05, TC07, TC08). Options: exempt final states from convention 15 and from W02, or keep the warnings as advisory noise. A decision is pending.
+1. Convention 15 and final states: final states cannot carry outgoing transitions, so every receivable event type yields a W02 pair for every final state (TC04, TC05, TC07, TC08). In the pilot notation the final target is the library done member; there is no final-state usage that could own further transitions. Options: exempt the done target from convention 15 and from W02, or keep the warnings as advisory noise. A decision is pending.
 2. Error states: a plain error state (TC05 sErr, example011 sErr) leaves the machine quiescent in a non-final state, which terminates as a deadlock report (D24) or, with a queued item, as D13 on the next dispatch; a final error state would instead surface leftover items as E13 (D34 rule 1). The profile does not yet prescribe which convention error states must follow. A decision is pending.
 3. Example010: TC05 is the minimized resolution of the (s1, I1) question; whether example010 itself receives the protecting transition remains open.
 
-## 6. Roadmap: second batch
+## 6. Validated textual notation
+
+All models in models/ validate against the SysML v2 Pilot Implementation parser (release 2026-08, kernel 0.62.0). The corpus fixes the following textual forms, on which the profile's examples and the test cases rely:
+
+| Construct | Validated form | Note |
+| --- | --- | --- |
+| Initial transition | `entry;` then `then state s1;` | The entry transition targets the state introduced by the succession shorthand. |
+| Chaining in a do behavior | `perform a1;` then `then send a1.iout to p1;` | There is no `first` before a perform; an unchained statement starts at the do behavior's start. |
+| `first` | `first get;` for a declared usage, e.g. `action get accept x : defs::I1;` | `first` takes a reference to a declared usage, never a perform or a send. |
+| Completion | `then done;` | Targets the library `done` state member; the pilot grammar has no `final` keyword or final-state notation. |
+| Transition shorthand | `accept defs::T via p1 then s2;` directly after the state usage | The source is the preceding state usage; an explicit `s1 accept ...` prefix is invalid syntax. |
+| Accept payload naming | `accept tr : defs::Trigger then s2 { ... }` | The name precedes the type. |
+| Assignment | `assign p1.received := tr;` | The operator is `:=`; in transition effect bodies `self` did not resolve, so part features are qualified by the part name. |
+| Constructor send | `send new defs::Trigger() to p1;` | ConstructorExpression with an item definition (D33). |
+| Scalar types | `ScalarValues::Integer` | Library types are not implicitly imported into a model package. |
+
+The pilot parser is silent on all profile-specific findings: it accepts the unordered model of TC06, the concurrent part-level perform of TC03, and the unconsumed items of TC04 without complaint. The E, W, and D findings of the profile therefore remain simulator-side checks.
+
+## 7. Roadmap: second batch
 
 - E01 and E11, positive and negative, including the D32 rule 5 exception for outputs read by an expression.
 - W01 for a declared usage that no behavior performs (D32 rule 3).

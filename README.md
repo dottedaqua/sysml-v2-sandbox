@@ -30,10 +30,24 @@ snapshot of the model and produces its own trace; the model store is never modif
 - `docs/simulation-metamodel.md` — the simulator-internal metamodel and the inputs
   required from the modeling tool for the adapter.
 - `docs/testcases.md` — the unit-level test-case suite: purpose, expected findings, scripted runs, and open discussion points.
-- `models/diagnostic-system.sysml` — the reference example model (textual rendering;
-  status DRAFT pending validation against the SysML v2 Pilot Implementation parser).
+- `models/010_example_state_change_item_transition.sysml` and
+  `models/011_example_state_change_payload_binding.sysml` — the integration-level
+  examples (two-send handover and trigger payload binding).
 - `models/testcases/` — small unit-level case models (TC01 through TC08), one rule
-  per case; DRAFT pending parser validation.
+  per case.
+- `tools/Validate.java` and `.github/workflows/validate-models.yml` — the model
+  validation pipeline against the SysML v2 Pilot Implementation parser (release
+  2026-08, kernel 0.62.0); runs on every push to main.
+
+## Model validation
+
+Every model in `models/` is validated against the official SysML v2 Pilot
+Implementation parser in CI (workflow `validate-models.yml`). The workflow downloads
+the `jupyter-sysml-kernel` release artifact, compiles the small helper
+`tools/Validate.java`, and runs it over all `*.sysml` files; a syntax or semantic
+error fails the build. The pilot parser checks the textual syntax and the language
+semantics only; the profile-specific findings (E, W codes) are expectations of the
+simulator's own static checks and are catalogued in `docs/testcases.md`.
 
 ## Planned roadmap
 
@@ -45,4 +59,6 @@ snapshot of the model and produces its own trace; the model store is never modif
 
 ## Status
 
-Specification baseline complete; implementation not yet started.
+Specification baseline complete; implementation not yet started. All example and
+test-case models validate against the official pilot parser; the validation runs in
+CI on every push.

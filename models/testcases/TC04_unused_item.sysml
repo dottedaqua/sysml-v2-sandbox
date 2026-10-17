@@ -11,7 +11,8 @@ package TC04_unused_item {
     // (D22) -> done is final with a waiting item -> E13 hard error; the
     // report names the second send through the token genealogy (section
     // 3.3). The run is not reported as successful (D34 rule 2).
-    // Status: DRAFT pending validation.
+    // Status: validated against the SysML v2 Pilot Implementation parser
+    // (release 2026-08, kernel 0.62.0); no parser findings.
 
     package defs {
         item def I1;
@@ -22,7 +23,7 @@ package TC04_unused_item {
             entry;
             then state s1 {
                 do action s1Do {
-                    first send new defs::I1() to p1;
+                    send new defs::I1() to p1;
                     then send new defs::I1() to p1;
                     then done;
                 }

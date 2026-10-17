@@ -26,7 +26,7 @@ package example010 {
             entry;
             then state s1 {
                 do action s1Do {
-                    first perform a1;
+                    perform a1;
                     then send a1.iout to p1;
                     then send new defs::StateTransitionTrigger() to p1;
                     then done;
