@@ -103,7 +103,7 @@ Triggerless completion transitions are part of the executability profile. A comp
 When a transition fires while a state's do behavior is executing, the do behavior is aborted immediately. Any action in progress at the abort instant is terminated, and all tokens within the do behavior are discarded. The abort is recorded in the trace with the position of every discarded token; discarding is reported, never silent. The exit behavior then runs.
 
 ### D24 — Run termination
-A run ends successfully only when all parts' state machines are in a final state. Quiescence with at least one part not in a final state is the deadlock anomaly of section 3.2. W02 statically reports events that could arrive in unprotected states, including final states. The implicit done state that a top-level completion transition of an exhibited state machine reaches is final for this purpose; the adapter marks it accordingly.
+A run ends successfully only when all parts' state machines are in a final state. Quiescence with at least one part not in a final state is the deadlock anomaly of section 3.2. W02 statically reports events that could arrive in unprotected states, including final states. The implicit done state that a top-level completion transition of an exhibited state machine reaches is final for this purpose; the adapter marks it accordingly. Successful termination additionally requires that no item is still waiting in a queue of any part; leftover items are reported as E13 (D34).
 
 ### D25 — Ports and event identity
 Ports carry multiple typed items. Event identity is the triple of receiving part instance, port, and item type. The receiving part holds one first-in-first-out queue per (port, item type) pair, refining D7 and D14; an accept action matches the oldest event in its queue, and its guard is evaluated on the payload of that event.
@@ -158,6 +158,16 @@ A ConstructorExpression of an item type, for example `new defs::StateTransitionT
 
 Consequential edits: D17 names item constructor expressions as part of the subset; section 6.6 records that the construction sends no events and changes no features.
 
+### D34 — Unused items at termination
+An item sent earlier that no accept action or transition has consumed by the end of the run is a clean error, not a silent remainder. Waiting in a queue is permitted for any duration (D22, D31); non-use at termination is not.
+
+1. The check applies when the run terminates successfully in the sense of D24 and, earlier, at the instant a part instance enters a final state, because from that instant no handler of that part can run again; leftover entries of that part are reported at that instant.
+2. Successful termination additionally requires empty queues: a run that reaches final states with items still waiting is not reported as successful; the finding is E13.
+3. The report is corrective. For each leftover item it states: the item identity and genealogy (D27, section 3.3); the send that produced it, with the sending behavior, the state of the sending state machine at send time, and the payload expression; the receiving part instance and queue (D31); every handler that could have consumed the item type, with the state or behavior in which it is active; and the states the receiving machine occupied while the item waited.
+4. Quiescence with waiting items cannot occur, because a waiting item is always dispatchable (D10); E13 therefore never coexists with the deadlock anomaly of section 3.2. D13 is unchanged: it fires at the moment a user dispatches an item that no handler accepts.
+
+Consequential edits: E13 is added to the error catalogue and to the runtime anomalies of section 3.2; D24 requires empty queues for successful termination.
+
 ## 3. Error Semantics
 
 ### 3.1 Structural findings (static, before any run)
@@ -180,6 +190,7 @@ Consequential edits: D17 names item constructor expressions as part of the subse
 | Blocking guard | A guard permanently prevents a branch from being taken. | Report as a warning when detected. |
 | Stranded token | A token can no longer proceed to any successor. | Pause and report. |
 | Arithmetic fault | Division by zero or an invalid operation on known operands. | Hard error: the run terminates with provenance of the expression and its inputs. |
+| Unused item at termination | The run reaches final states while items still wait in queues (D34). | Hard error (E13): the run is not reported as successful; each leftover item is reported with full provenance. |
 
 ### 3.3 Token genealogy
 Every token carries a causal history: the nodes it passed through and the decisions that produced it. Runtime anomalies present this provenance so that the user can trace from which side of the model an error originated. User choices at pause points are part of the recorded history, enabling deterministic replay.
@@ -220,6 +231,7 @@ All checks operate on the simulation metamodel after loading, never on the API s
 | E10 | Recursive containment | A part directly or indirectly contains itself with unbounded multiplicity, which would produce infinite instantiation. |
 | E11 | Orphan output | An action output produces tokens with no destination, that is, no outgoing flow and no expression reading it (D32), and is not explicitly declared unused in the model. |
 | E12 | Undefined ordering dependency | An expression, for example a send payload or a computed output, reads a feature of another occurrence while no explicit succession or flow orders that occurrence before the reading occurrence. The kernel does not derive implicit data dependencies; the model must express the ordering explicitly. |
+| E13 | Unused item at termination | An item that a send action delivered to a queue earlier in the run is still waiting in that queue when the run terminates (D24, D34), or when the receiving part reaches a final state. |
 
 ### 5.2 Warnings (advisory)
 
