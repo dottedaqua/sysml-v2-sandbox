@@ -28,6 +28,7 @@ snapshot of the model and produces its own trace; the model store is never modif
   decisions D1 through D34, error semantics, static check catalogue, expression
   evaluator semantics, and the supported modeling conventions.
 - `docs/simulation-metamodel.md` — the simulator-internal metamodel and the inputs
+- `docs/testcases.md` - the unit-level test-case suite: purpose, expected findings, scripted runs, and open discussion points.
   required from the modeling tool for the adapter.
 - `models/diagnostic-system.sysml` — the reference example model (textual rendering;
   status DRAFT pending validation against the SysML v2 Pilot Implementation parser).
