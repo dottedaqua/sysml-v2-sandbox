@@ -82,10 +82,10 @@ The existing examples, models/010_example_state_change_item_transition.sysml (tw
 - Scripted run: (1) s1Do sends a fresh Payload with unknown code and completes; (2) the Payload is dispatched; the transition effect reads pl.code: D11 pause; the user supplies 42; the choice is recorded (section 3.3); (3) s2 is stable; the completion transition fires (D22); done is final; success.
 - Pass criteria: exactly one pause; the recorded value 42 appears in the trace and in the subsequent state of lastCode.
 
-## 5. Open discussion points
+## 5. Discussion points
 
 1. Convention 15 and final states: final states cannot carry outgoing transitions, so every receivable event type yields a W02 pair for every final state (TC04, TC05, TC07, TC08). In the pilot notation the final target is the library done member; there is no final-state usage that could own further transitions. Options: exempt the done target from convention 15 and from W02, or keep the warnings as advisory noise. A decision is pending.
-2. Error states: a plain error state (TC05 sErr, example011 sErr) leaves the machine quiescent in a non-final state, which terminates as a deadlock report (D24) or, with a queued item, as D13 on the next dispatch; a final error state would instead surface leftover items as E13 (D34 rule 1). The profile does not yet prescribe which convention error states must follow. A decision is pending.
+2. Error states: resolved by D35. A plain error state (TC05 sErr, example011 sErr) is legitimate: the machine becomes quiescent in a non-final state, the run ends as an ended-in-state end (D24, D35), and a queued item without a handler surfaces as D13 on the next dispatch rather than as an end. A final error state would instead surface leftover items as E13 (D34 rule 1). Which form a model uses is the modeller's choice and expresses what the modeller wants to show; TC05 and example011 use the plain form and require no change.
 3. Example010: TC05 is the minimized resolution of the (s1, I1) question; whether example010 itself receives the protecting transition remains open.
 
 ## 6. Validated textual notation
@@ -97,7 +97,7 @@ All models in models/ validate against the SysML v2 Pilot Implementation parser 
 | Initial transition | `entry;` then `then state s1;` | The entry transition targets the state introduced by the succession shorthand. |
 | Chaining in a do behavior | `perform a1;` then `then send a1.iout to p1;` | There is no `first` before a perform; an unchained statement starts at the do behavior's start. |
 | `first` | `first get;` for a declared usage, e.g. `action get accept x : defs::I1;` | `first` takes a reference to a declared usage, never a perform or a send. |
-| Completion | `then done;` | Targets the library `done` state member; the pilot grammar has no `final` keyword or final-state notation. |
+| Completion | `then done;` | Targets the `done` completion member of the enclosing exhibited state or do behavior (Action::done, redefined as a state by StateAction in the Systems Library); the pilot grammar has no `final` keyword or final-state notation. |
 | Transition shorthand | `accept defs::T via p1 then s2;` directly after the state usage | The source is the preceding state usage; an explicit `s1 accept ...` prefix is invalid syntax. |
 | Accept payload naming | `accept tr : defs::Trigger then s2 { ... }` | The name precedes the type. |
 | Assignment | `assign p1.received := tr;` | The operator is `:=`; in transition effect bodies `self` did not resolve, so part features are qualified by the part name. |
@@ -118,4 +118,5 @@ The pilot parser is silent on all profile-specific findings: it accepts the unor
 - Guards: W03 non-exhaustive decision, W04 constant-false guard, the blocking-guard anomaly.
 - D26: bind chains across hierarchy levels.
 - D14: the buffer-growth warning for a consumer that never fires.
+- D35: an ended-in-state end, a plain terminal state (for example an off or error state) reached with empty queues, and the informational listing of queued items when the modeller ends the run at a pause point (D34 rule 5).
 - Two-part cases: cross-part delivery without ports (D31 rule 2) and E03, the unroutable event.

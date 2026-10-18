@@ -1,4 +1,3 @@
-
 # SysML v2 Simulator — Semantic Profile
 
 This document records the language and simulation semantics decisions for the planned SysML v2 behavior simulator. It is the specification baseline from which the tool architecture shall be derived.
@@ -102,8 +101,8 @@ Triggerless completion transitions are part of the executability profile. A comp
 ### D23 — Preemption of do behaviors
 When a transition fires while a state's do behavior is executing, the do behavior is aborted immediately. Any action in progress at the abort instant is terminated, and all tokens within the do behavior are discarded. The abort is recorded in the trace with the position of every discarded token; discarding is reported, never silent. The exit behavior then runs.
 
-### D24 — Run termination
-A run ends successfully only when all parts' state machines are in a final state. Quiescence with at least one part not in a final state is the deadlock anomaly of section 3.2. W02 statically reports events that could arrive in unprotected states, including final states. The implicit done state that a top-level completion transition of an exhibited state machine reaches is final for this purpose; the adapter marks it accordingly. Successful termination additionally requires that no item is still waiting in a queue of any part; leftover items are reported as E13 (D34).
+### D24 — Run end and successful termination
+A run ends when the system becomes quiescent: no behavior can proceed, every part has either completed its exhibited behavior or occupies a state with no dispatchable event, and all queues are empty (D34 rule 4). The end is classified per D35. An exhibited state machine completes successfully when it reaches done, the completion member of the exhibited state; in the validated textual notation this is the top-level succession `then done;` (docs/testcases.md section 6). The done target that a top-level completion succession of an exhibited state machine reaches is final for this purpose; the adapter materializes it as a final state and marks it accordingly. A run terminates successfully only when all parts' state machines have thus reached a final state; successful termination additionally requires that no item is still waiting in a queue of any part, with leftovers reported as E13 (D34). An end with at least one part not in a final state is an ended-in-state end and is legitimate (D35). W02 statically reports events that could arrive in unprotected states, including final states.
 
 ### D25 — Ports and event identity
 Ports carry multiple typed items. Event identity is the triple of receiving part instance, port, and item type. The receiving part holds one first-in-first-out queue per (port, item type) pair, refining D7 and D14; an accept action matches the oldest event in its queue, and its guard is evaluated on the payload of that event.
@@ -164,9 +163,20 @@ An item sent earlier that no accept action or transition has consumed by the end
 1. The check applies when the run terminates successfully in the sense of D24 and, earlier, at the instant a part instance enters a final state, because from that instant no handler of that part can run again; leftover entries of that part are reported at that instant.
 2. Successful termination additionally requires empty queues: a run that reaches final states with items still waiting is not reported as successful; the finding is E13.
 3. The report is corrective. For each leftover item it states: the item identity and genealogy (D27, section 3.3); the send that produced it, with the sending behavior, the state of the sending state machine at send time, and the payload expression; the receiving part instance and queue (D31); every handler that could have consumed the item type, with the state or behavior in which it is active; and the states the receiving machine occupied while the item waited.
-4. Quiescence with waiting items cannot occur, because a waiting item is always dispatchable (D10); E13 therefore never coexists with the deadlock anomaly of section 3.2. D13 is unchanged: it fires at the moment a user dispatches an item that no handler accepts.
+4. Quiescence with waiting items cannot occur, because a waiting item is always dispatchable (D10); E13 therefore never coexists with the quiescent end of section 3.2. D13 is unchanged: it fires at the moment a user dispatches an item that no handler accepts.
+5. A run that ends in a state without done (D35) does not fire E13. Items still in queues at such an end are listed informationally in the run report, with the provenance of rule 3, so that the modeller can judge whether undelivered items were intended. By rule 4, a quiescent end has empty queues by construction; the listing applies in particular when the modeller ends or aborts the run at a pause point with unconsumed items.
 
-Consequential edits: E13 is added to the error catalogue and to the runtime anomalies of section 3.2; D24 requires empty queues for successful termination.
+Consequential edits: E13 is added to the error catalogue and to the runtime anomalies of section 3.2; D24 requires empty queues for successful termination; D35 rule 3 refers to this rule.
+
+### D35 — Termination is a modeling choice
+Whether an exhibited state machine ever reaches done is a modeling decision, not a well-formedness requirement; ending in an ordinary state is a legitimate outcome of a run and expresses what the modeller wants to show.
+
+1. A run may end with one or more parts occupying states that have not completed to done, for example an error state or an off state. Such an end is classified as ended in state; the report records the end occupancy of every part, and the end is not an anomaly.
+2. The simulator cannot structurally distinguish an intended end in a state from an unintended deadlock; both are quiescence with incomplete behavior. The report therefore presents the end occupancy neutrally, and whether the end was intended remains the modeller's judgement.
+3. Ended in state is not successful termination in the sense of D24; E13 does not fire. Items still queued at such an end are listed informationally (D34 rule 5).
+4. W02, convention 15, and D13 are unchanged. If a part occupies a terminal state and a queued item has no handler there, the situation does not constitute an end: the item is dispatchable (D34 rule 4), and dispatching it fires D13.
+
+Consequential edits: D24 is reworded (quiescence ends the run; end classification); the deadlock row of section 3.2 is reworded as the quiescent end; discussion point 2 of docs/testcases.md section 5 is resolved in favour of plain error states (TC05 sErr and example011 sErr are canonical and require no change).
 
 ## 3. Error Semantics
 
@@ -185,7 +195,7 @@ Consequential edits: E13 is added to the error catalogue and to the runtime anom
 
 | Anomaly | Description | Reaction |
 | --- | --- | --- |
-| Deadlock | The system becomes quiescent while at least one part is not in a final state (D24). | Pause and report. |
+| Quiescent end | The system becomes quiescent while at least one part has not reached done (D24, D35). | Pause and report the end occupancy of every part; the end is legitimate (D35), and its classification as an intended end or a modeling defect is left to the modeller. |
 | Event without accepting transition | An event arrives at a part in a state where no transition can accept it. | Hard error (D13): the run terminates with a fatal error report and full event provenance. |
 | Blocking guard | A guard permanently prevents a branch from being taken. | Report as a warning when detected. |
 | Stranded token | A token can no longer proceed to any successor. | Pause and report. |
