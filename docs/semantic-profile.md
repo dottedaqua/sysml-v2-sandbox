@@ -102,7 +102,7 @@ Triggerless completion transitions are part of the executability profile. A comp
 When a transition fires while a state's do behavior is executing, the do behavior is aborted immediately. Any action in progress at the abort instant is terminated, and all tokens within the do behavior are discarded. The abort is recorded in the trace with the position of every discarded token; discarding is reported, never silent. The exit behavior then runs.
 
 ### D24 — Run end and successful termination
-A run ends when the system becomes quiescent: no behavior can proceed, every part has either completed its exhibited behavior or occupies a state with no dispatchable event, and all queues are empty (D34 rule 4). The end is classified per D35. An exhibited state machine completes successfully when it reaches done, the completion member of the exhibited state; in the validated textual notation this is the top-level succession `then done;` (docs/testcases.md section 6). The done target that a top-level completion succession of an exhibited state machine reaches is final for this purpose; the adapter materializes it as a final state and marks it accordingly. A run terminates successfully only when all parts' state machines have thus reached a final state; successful termination additionally requires that no item is still waiting in a queue of any part, with leftovers reported as E13 (D34). An end with at least one part not in a final state is an ended-in-state end and is legitimate (D35). W02 statically reports events that could arrive in unprotected states, including final states.
+A run ends when the system becomes quiescent: no behavior can proceed, every part has either completed its exhibited behavior or occupies a state with no dispatchable event, and all queues are empty (D34 rule 4). The end is classified per D35. An exhibited state machine completes successfully when it reaches done, the completion member of the exhibited state; in the validated textual notation this is the top-level succession `then done;` (docs/testcases.md section 6). The done target that a top-level completion succession of an exhibited state machine reaches is final for this purpose; the adapter materializes it as a final state and marks it accordingly. A run terminates successfully only when all parts' state machines have thus reached a final state; successful termination additionally requires that no item is still waiting in a queue of any part, with leftovers reported as E13 (D34). An end with at least one part not in a final state is an ended-in-state end and is legitimate (D35). W02 statically reports events that could arrive in unprotected states; the final state is exempt (D36).
 
 ### D25 — Ports and event identity
 Ports carry multiple typed items. Event identity is the triple of receiving part instance, port, and item type. The receiving part holds one first-in-first-out queue per (port, item type) pair, refining D7 and D14; an accept action matches the oldest event in its queue, and its guard is evaluated on the payload of that event.
@@ -178,6 +178,16 @@ Whether an exhibited state machine ever reaches done is a modeling decision, not
 
 Consequential edits: D24 is reworded (quiescence ends the run; end classification); the deadlock row of section 3.2 is reworded as the quiescent end; discussion point 2 of docs/testcases.md section 5 is resolved in favour of plain error states (TC05 sErr and example011 sErr are canonical and require no change).
 
+### D36 — Final-state exemption from the unexpected-event convention
+The done target of a top-level completion succession, materialized by the adapter as a final state (D24), is exempt from convention 15 and from W02.
+
+1. Rationale: a final state owns no outgoing transitions and executes nothing after completion, so the unexpected-event convention is structurally unsatisfiable for it; the protection it provides elsewhere is already provided here by E13, which fires at the instant a part enters a final state with leftover queue entries (D34 rule 1), and by the empty-queue requirement of successful termination (D34 rule 2).
+2. Convention 15 applies to every reachable state except the final state. Ordinary terminal states that have not completed to done, for example an error state or an off state, remain fully subject to the convention (D35).
+3. The W02 detection skips the done target materialized as a final state; (final state, event type) pairs are not reported.
+4. E13 and D13 are unchanged: an item still queued when a part enters a final state fires E13, and a queued item without a handler in a plain terminal state fires D13 on dispatch (D35 rule 4).
+
+Consequential edits: convention 15 is reworded; the W02 row and its detection method record the exemption; D24's W02 sentence and the closing paragraph of section 4 record it; the expected W02 findings of TC04 through TC08 in docs/testcases.md lose their (done, E) entries, and discussion point 1 is resolved.
+
 ## 3. Error Semantics
 
 ### 3.1 Structural findings (static, before any run)
@@ -219,7 +229,7 @@ The following are deliberately out of scope for the first version and may be rev
 8. Broadcast semantics for unindexed references and send targets through part usages with multiplicity (excluded by D30).
 9. Broadcast of a single event occurrence to multiple acceptors. An occurrence is consumed exactly once; the handover of an item across a state transition is modeled either through trigger payload binding on the transition or through a second send whose event is consumed by an accept action in the target state's do behavior, never through multiple consumption.
 
-All modeling-convention clarifications are resolved. The unexpected-event convention (an else-guarded or default transition to an explicit error state for every event type a state can receive) is adopted as a mandatory modeling rule; W02 reports violations of this rule (see section 8).
+All modeling-convention clarifications are resolved. The unexpected-event convention (an else-guarded or default transition to an explicit error state for every event type a state can receive; the final state is exempt, D36) is adopted as a mandatory modeling rule; W02 reports violations of this rule (see section 8).
 
 ## 5. Static Check Catalogue
 
@@ -248,7 +258,7 @@ All checks operate on the simulation metamodel after loading, never on the API s
 | ID | Check | Condition |
 | --- | --- | --- |
 | W01 | Unreachable node | An action or state cannot be reached from any initially started behavior or initial state. |
-| W02 | Potential unhandled event | Part P may statically receive event type E in state S while no transition of S accepts E, no else or completion transition covers it, and no accept action that the do behavior of S reaches unconditionally accepts E. Runtime verification of such a situation is a hard error (D13). |
+| W02 | Potential unhandled event | Part P may statically receive event type E in state S while no transition of S accepts E, no else or completion transition covers it, and no accept action that the do behavior of S reaches unconditionally accepts E. The final state is exempt (D36); a completed part is covered by E13 instead. Runtime verification of such a situation is a hard error (D13). |
 | W03 | Non-exhaustive decision | A decision node has no else guard and its guards are not provably exhaustive. |
 | W04 | Constant-false guard | A guard is statically always false; the transition or branch can never fire. |
 | W05 | Unproducible trigger | A transition trigger names an event type that no element in the model ever produces. |
@@ -256,7 +266,7 @@ All checks operate on the simulation metamodel after loading, never on the API s
 | W07 | Deadlock potential | A composite structure can become quiescent while behavior is incomplete; reported where decidable. |
 | W08 | Multiple usages of one action definition | An action definition acquires more than one declared usage, violating convention 10 and making state machine references ambiguous; reference performs of the one declared usage are not usages (D32). |
 
-Detection method for W02: for each part, compute the set of event types it can receive, from item flows across connections targeting it and from send actions in other parts, including port-less sends and self-sends (D31), and the set of statically reachable states. Report every (state, event type) pair not covered by an accepting transition, an else guard, a completion transition, or an accept action that the do behavior of the state reaches unconditionally, that is, without an intervening guard, decision, or event-dependent step; where this reachability is not decidable, the pair is reported, as with W07. The computation over-approximates, which is why the finding is a warning; at runtime, D13 applies.
+Detection method for W02: for each part, compute the set of event types it can receive, from item flows across connections targeting it and from send actions in other parts, including port-less sends and self-sends (D31), and the set of statically reachable states, excluding the done target that the adapter materializes as a final state (D24, D36). Report every (state, event type) pair not covered by an accepting transition, an else guard, a completion transition, or an accept action that the do behavior of the state reaches unconditionally, that is, without an intervening guard, decision, or event-dependent step; where this reachability is not decidable, the pair is reported, as with W07. The computation over-approximates, which is why the finding is a warning; at runtime, D13 applies.
 
 ## 6. Expression Evaluator Semantics
 
@@ -305,5 +315,5 @@ The simulator targets the following modeling style, which the adapter (D20) must
 12. Items are instances with identity; item types may be structured with attributes (D27).
 13. A part may send events to itself; self-sends are dispatched after the current run-to-completion step (D28).
 14. No orthogonal state regions; parallelism is modeled only with fork and join.
-15. The unexpected-event convention is mandatory: every reachable state must handle every event type it can receive, either through a specific transition or through an else-guarded or default transition to an explicit error state. W02 reports violations.
+15. The unexpected-event convention is mandatory: every reachable state except the final state must handle every event type it can receive, either through a specific transition or through an else-guarded or default transition to an explicit error state. The final state is exempt (D36). W02 reports violations.
 16. References to action usages from state machines use qualified names; through part usages with multiplicity greater than one, an explicit instance index is required (D30).

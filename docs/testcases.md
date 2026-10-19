@@ -53,38 +53,38 @@ The existing examples, models/010_example_state_change_item_transition.sysml (tw
 
 ### TC04 - Unused item at termination
 - Intent: two produced items, one consumed; the leftover item surfaces as E13, with the genealogy naming the producing send.
-- Load findings: W02 for (s2, I1) and (done, I1) (over-approximating detection); acknowledged.
+- Load findings: W02 for (s2, I1) (over-approximating detection); acknowledged.
 - Scripted run: (1) s1 is entered; s1Do sends two fresh I1 instances (distinct identities, D27, D33) and completes; (2) the oldest I1 is dispatched (D31); the transition to s2 fires; (3) s2 is stable; its completion transition takes priority over the queued second I1 (D22); s2 to done; (4) done is final and the queue of p1 is not empty: E13 fires (D34 rules 1 and 2); the report names the second send as the producer of the leftover item; the run is not reported as successful.
 - Pass criteria: hard error E13; the genealogy of the reported item resolves to the second send; the first item is reported as consumed.
 
 ### TC05 - Protecting transition
 - Intent: the example010 two-send handover, minimized, with the unexpected-event protection of convention 15; both dispatch orders are documented.
-- Load findings: W02 for (s2, Trigger), (sErr, I1), (sErr, Trigger), (done, I1), (done, Trigger); acknowledged. (s2, I1) is covered by get as the unconditional first step of s2Do.
+- Load findings: W02 for (s2, Trigger), (sErr, I1), (sErr, Trigger); acknowledged. (s2, I1) is covered by get as the unconditional first step of s2Do; (done, E) pairs are exempt (D36).
 - Intended path: (1) s1Do performs a1, sends a1.iout, sends a fresh Trigger, and completes; (2) the user dispatches the Trigger (choice); s1 to s2; (3) s2Do: get accepts the queued I1, the flow carries it to a2.iin, perform a2 starts a2, which consumes and completes; s2Do completes; (4) completion s2 to done (D22); queues are empty; success.
 - Wrong path: (1) the user dispatches I1 first; the protecting transition s1 to sErr fires and consumes it; (2) the Trigger is still queued; the user dispatches it; no handler of sErr accepts it: D13 hard error with provenance.
 - Pass criteria: both paths behave as specified; the wrong path terminates through D13, not through a silent discard.
 
 ### TC06 - Undefined ordering dependency
 - Intent: a send payload reads an action output that no succession orders before the send; E12 is blocking.
-- Load findings: E12 (blocking); W02 for (s2, I1) and (done, I1).
+- Load findings: E12 (blocking); W02 for (s2, I1).
 - Expected behavior: the run cannot start (D18). The pilot parser accepts the uncorrected model without findings; the ordering violation is detected only by the simulator (E12). Resolution in the model: an explicit succession, perform a1; then send a1.iout to p1; the corrected model matches TC05 structurally.
 - Pass criteria: E12 reported with the reading expression and the unordered producer named.
 
 ### TC07 - Trigger payload binding
 - Intent: the first handover pattern of deferred-scope item 9, minimized from example011: a single occurrence crosses the transition through payload binding, consumed exactly once.
-- Load findings: W02 for (s2, Trigger) and (done, Trigger); acknowledged.
+- Load findings: W02 for (s2, Trigger); acknowledged.
 - Scripted run: (1) s1Do sends a fresh Trigger (D33) and completes; (2) the Trigger is dispatched; the transition fires; the effect binds the payload to the part feature (identity preserved, D26, D27); (3) s2 is stable; its completion transition fires (D22); (4) done is final; queues are empty; success.
 - Pass criteria: success; exactly one consumption of the occurrence; the bound feature and the sent item have the same identity.
 
 ### TC08 - Unknown value and the D11 pause
 - Intent: a constructed item attribute without a modeled default is unknown (D15, D33 rule 3); the effect that reads it pauses the run; the user-supplied value is recorded.
-- Load findings: W02 for (s2, Payload) and (done, Payload); acknowledged.
+- Load findings: W02 for (s2, Payload); acknowledged.
 - Scripted run: (1) s1Do sends a fresh Payload with unknown code and completes; (2) the Payload is dispatched; the transition effect reads pl.code: D11 pause; the user supplies 42; the choice is recorded (section 3.3); (3) s2 is stable; the completion transition fires (D22); done is final; success.
 - Pass criteria: exactly one pause; the recorded value 42 appears in the trace and in the subsequent state of lastCode.
 
 ## 5. Discussion points
 
-1. Convention 15 and final states: final states cannot carry outgoing transitions, so every receivable event type yields a W02 pair for every final state (TC04, TC05, TC07, TC08). In the pilot notation the final target is the library done member; there is no final-state usage that could own further transitions. Options: exempt the done target from convention 15 and from W02, or keep the warnings as advisory noise. A decision is pending.
+1. Convention 15 and final states: resolved by D36. The done target, materialized by the adapter as a final state, is exempt from convention 15 and from W02: the convention is structurally unsatisfiable for a state that owns no transitions, and the residual risk, an event delivered to a completed part, is owned by E13 (D34 rule 1). The (done, E) entries were removed from the expected findings of TC04, TC05, TC06, TC07, and TC08. Ordinary terminal states that have not completed to done (sErr, off) remain fully subject to convention 15 and W02 (D35).
 2. Error states: resolved by D35. A plain error state (TC05 sErr, example011 sErr) is legitimate: the machine becomes quiescent in a non-final state, the run ends as an ended-in-state end (D24, D35), and a queued item without a handler surfaces as D13 on the next dispatch rather than as an end. A final error state would instead surface leftover items as E13 (D34 rule 1). Which form a model uses is the modeller's choice and expresses what the modeller wants to show; TC05 and example011 use the plain form and require no change.
 3. Example010: TC05 is the minimized resolution of the (s1, I1) question; whether example010 itself receives the protecting transition remains open.
 
